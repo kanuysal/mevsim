@@ -21,22 +21,22 @@ export default function Model(props) {
   const texture_1 = useKTX2Texture("/textures/Scene_2_Spring_1.webp", {
     side: "double",
     transparent: true,
-    alphaTest: 0.5,
+    alphaTest: 0,
   });
   const texture_2 = useKTX2Texture("/textures/Scene_2_Spring_2.webp", {
     side: "double",
     transparent: true,
-    alphaTest: 0.5,
+    alphaTest: 0,
   });
   const texture_3 = useKTX2Texture("/textures/Scene_2_Spring_3.webp", {
     side: "double",
     transparent: true,
-    alphaTest: 0.5,
+    alphaTest: 0,
   });
   const texture_4 = useKTX2Texture("/textures/Scene_2_Spring_4.webp", {
     side: "double",
     transparent: true,
-    alphaTest: 0.5,
+    alphaTest: 0,
   });
 
   const gateLeftRef = useRef();
