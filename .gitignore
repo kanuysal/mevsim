@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Testing/Backups
+*_backup.*
+*backup*
+public/textures/png/*
+public/textures/yedek/
+!public/textures/png/.gitkeep
+
+# 3D Assets & Sources
+*.ktx2
+*.blend
+*.blend1
+*.psd
+raw_assets/
+Blender Files and Addon/
+
+# Build
+dist/
+.env
+.env.local
+
+# IDEs
+.vscode/
+.idea/
+.DS_Store
+*.log

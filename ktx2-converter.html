@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KTX2 to PNG Converter</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #121212;
+            color: #eee;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+        #drop-zone {
+            width: 80%;
+            height: 300px;
+            border: 3px dashed #444;
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            color: #888;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            text-align: center;
+            padding: 20px;
+        }
+        #drop-zone.dragover {
+            border-color: #00ffcc;
+            background: #1a1a1a;
+            color: #00ffcc;
+        }
+        #status {
+            margin-top: 20px;
+            font-size: 1rem;
+            color: #aaa;
+        }
+        .file-list {
+            margin-top: 20px;
+            width: 80%;
+            max-height: 200px;
+            overflow-y: auto;
+            background: #1e1e1e;
+            border-radius: 10px;
+            padding: 10px;
+        }
+        .file-item {
+            padding: 5px 10px;
+            border-bottom: 1px solid #333;
+            font-size: 0.9rem;
+            display: flex;
+            justify-content: space-between;
+        }
+        .file-item.done { color: #00ffcc; }
+        .file-item.error { color: #ff4444; }
+    </style>
+</head>
+<body>
+
+    <h1>KTX2 to PNG Converter</h1>
+    <div id="drop-zone">.ktx2 dosyalarını buraya sürükleyin veya tıklayın</div>
+    <input type="file" id="file-input" multiple accept=".ktx2" style="display: none;">
+    
+    <div id="status">Hazır</div>
+    <div id="file-list" class="file-list"></div>
+
+    <!-- Script imports -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { KTX2Loader } from 'three/addons/loaders/KTX2Loader.js';
+
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+        const status = document.getElementById('status');
+        const fileList = document.getElementById('file-list');
+
+        // Setup THREE Renderer
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        const ktx2Loader = new KTX2Loader();
+        ktx2Loader.setTranscoderPath('https://unpkg.com/three@0.160.0/examples/jsm/libs/basis/');
+        ktx2Loader.detectSupport(renderer);
+
+        dropZone.onclick = () => fileInput.click();
+
+        dropZone.ondragover = (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        };
+
+        dropZone.ondragleave = () => dropZone.classList.remove('dragover');
+
+        dropZone.ondrop = (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            handleFiles(e.dataTransfer.files);
+        };
+
+        fileInput.onchange = (e) => handleFiles(e.target.files);
+
+        async function handleFiles(files) {
+            status.innerText = `${files.length} dosya işleniyor...`;
+            for (const file of files) {
+                if (file.name.endsWith('.ktx2')) {
+                    await convertFile(file);
+                }
+            }
+            status.innerText = "İşlem tamamlandı.";
+        }
+
+        async function convertFile(file) {
+            const item = document.createElement('div');
+            item.className = 'file-item';
+            item.innerHTML = `<span>${file.name}</span> <span>İşleniyor...</span>`;
+            fileList.prepend(item);
+
+            try {
+                const url = URL.createObjectURL(file);
+                const texture = await ktx2Loader.loadAsync(url);
+                
+                // Create a canvas to draw the texture
+                const canvas = document.createElement('canvas');
+                canvas.width = texture.image.width;
+                canvas.height = texture.image.height;
+                const ctx = canvas.getContext('2d');
+
+                // We need to use a WebGL context to read the pixels because KTX2 is compressed
+                const width = texture.image.width;
+                const height = texture.image.height;
+                
+                const renderTarget = new THREE.WebGLRenderTarget(width, height);
+                renderer.setSize(width, height);
+                
+                const scene = new THREE.Scene();
+                const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+                const mesh = new THREE.Mesh(
+                    new THREE.PlaneGeometry(2, 2),
+                    new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide })
+                );
+                scene.add(mesh);
+                
+                renderer.setRenderTarget(renderTarget);
+                renderer.render(scene, camera);
+
+                const pixelData = new Uint8Array(width * height * 4);
+                renderer.readRenderTargetPixels(renderTarget, 0, 0, width, height, pixelData);
+                
+                // Put pixel data into a canvas to save as PNG
+                const imgData = ctx.createImageData(width, height);
+                
+                // Flip pixels vertically (WebGL is Y-up, Canvas is Y-down)
+                for (let y = 0; y < height; y++) {
+                    for (let x = 0; x < width; x++) {
+                        const srcIdx = (y * width + x) * 4;
+                        const destIdx = ((height - 1 - y) * width + x) * 4;
+                        imgData.data[destIdx] = pixelData[srcIdx];
+                        imgData.data[destIdx + 1] = pixelData[srcIdx + 1];
+                        imgData.data[destIdx + 2] = pixelData[srcIdx + 2];
+                        imgData.data[destIdx + 3] = pixelData[srcIdx + 3];
+                    }
+                }
+                
+                ctx.putImageData(imgData, 0, 0);
+                
+                // Trigger download
+                const pngUrl = canvas.toDataURL('image/png');
+                const downloadLink = document.createElement('a');
+                downloadLink.href = pngUrl;
+                downloadLink.download = file.name.replace('.ktx2', '.png');
+                downloadLink.click();
+
+                item.className = 'file-item done';
+                item.lastElementChild.innerText = 'Tamamlandı';
+                
+                // Cleanup
+                texture.dispose();
+                renderTarget.dispose();
+                URL.revokeObjectURL(url);
+
+            } catch (err) {
+                console.error(err);
+                item.className = 'file-item error';
+                item.lastElementChild.innerText = 'Hata!';
+            }
+        }
+    </script>
+</body>
+</html>
